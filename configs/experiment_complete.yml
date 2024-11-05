@@ -1,73 +1,73 @@
 model_name: "BAAI/bge-small-en-v1.5"
 
 tasks:
-  AppsRetrieval
-  CodeFeedbackMT
-  CosQA
-  StackOverflowQA
-  SyntheticText2SQL
-  AILACasedocs
-  AILAStatutes
-  ARCChallenge
-  ArguAna
-  ClimateFEVERHardNegatives
-  CQADupstackAndroidRetrieval
-  CQADupstackEnglishRetrieval
-  CQADupstackGamingRetrieval
-  CQADupstackGisRetrieval
-  CQADupstackMathematicaRetrieval
-  CQADupstackPhysicsRetrieval
-  CQADupstackProgrammersRetrieval
-  CQADupstackStatsRetrieval
-  CQADupstackTexRetrieval
-  CQADupstackUnixRetrieval
-  CQADupstackWebmastersRetrieval
-  CQADupstackWordpressRetrieval
-  DBPediaHardNegatives
-  FaithDial
-  FeedbackQARetrieval
-  FEVERHardNegatives
-  FiQA2018
-  HagridRetrieval
-  HellaSwag
-  HotpotQAHardNegatives
-  LegalBenchConsumerContractsQA
-  LegalBenchCorporateLobbying
-  LegalSummarization
-  LEMBNarrativeQARetrieval
-  LEMBNeedleRetrieval
-  LEMBPasskeyRetrieval
-  LEMBQMSumRetrieval
-  LEMBSummScreenFDRetrieval
-  LEMBWikimQARetrieval
-  LitSearchRetrieval
-  MedicalQARetrieval
-  MLQuestions
-  MSMARCOHardNegatives
-  NarrativeQARetrieval
-  NFCorpus
-  NQHardNegatives
-  PIQA
-  Quail
-  QuoraRetrieval
-  QuoraRetrievalHardNegatives
-  RARbCode
-  RARbMath
-  SCIDOCS
-  SciFact
-  SIQA
-  SpartQA
-  TempReasonL1
-  TempReasonL2Context
-  TempReasonL2Fact
-  TempReasonL2Pure
-  TempReasonL3Context
-  TempReasonL3Fact
-  TempReasonL3Pure
-  TopiOCQAHardNegatives
-  Touche2020Retrievalv"
-  TRECCOVID
-  WinoGrande
+  - AppsRetrieval
+  - CodeFeedbackMT
+  - CosQA
+  - StackOverflowQA
+  - SyntheticText2SQL
+  - AILACasedocs
+  - AILAStatutes
+  - ARCChallenge
+  - ArguAna
+  - ClimateFEVERHardNegatives
+  - CQADupstackAndroidRetrieval
+  - CQADupstackEnglishRetrieval
+  - CQADupstackGamingRetrieval
+  - CQADupstackGisRetrieval
+  - CQADupstackMathematicaRetrieval
+  - CQADupstackPhysicsRetrieval
+  - CQADupstackProgrammersRetrieval
+  - CQADupstackStatsRetrieval
+  - CQADupstackTexRetrieval
+  - CQADupstackUnixRetrieval
+  - CQADupstackWebmastersRetrieval
+  - CQADupstackWordpressRetrieval
+  - DBPediaHardNegatives
+  - FaithDial
+  - FeedbackQARetrieval
+  - FEVERHardNegatives
+  - FiQA2018
+  - HagridRetrieval
+  - HellaSwag
+  - HotpotQAHardNegatives
+  - LegalBenchConsumerContractsQA
+  - LegalBenchCorporateLobbying
+  - LegalSummarization
+  - LEMBNarrativeQARetrieval
+  - LEMBNeedleRetrieval
+  - LEMBPasskeyRetrieval
+  - LEMBQMSumRetrieval
+  - LEMBSummScreenFDRetrieval
+  - LEMBWikimQARetrieval
+  - LitSearchRetrieval
+  - MedicalQARetrieval
+  - MLQuestions
+  - MSMARCOHardNegatives
+  - NarrativeQARetrieval
+  - NFCorpus
+  - NQHardNegatives
+  - PIQA
+  - Quail
+  - QuoraRetrieval
+  - QuoraRetrievalHardNegatives
+  - RARbCode
+  - RARbMath
+  - SCIDOCS
+  - SciFact
+  - SIQA
+  - SpartQA
+  - TempReasonL1
+  - TempReasonL2Context
+  - TempReasonL2Fact
+  - TempReasonL2Pure
+  - TempReasonL3Context
+  - TempReasonL3Fact
+  - TempReasonL3Pure
+  - TopiOCQAHardNegatives
+  - Touche2020Retrievalv"
+  - TRECCOVID
+  - WinoGrande
 
 experiments:
   - name: float32
