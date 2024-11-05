@@ -117,7 +117,7 @@ class EmbeddingEngine:
         """Create a Qdrant collection if it doesn't exist."""
         try:
             self.qdrant_client.get_collection(collection_name)
-        except UnexpectedResponse:
+        except (UnexpectedResponse, ValueError):
             self.qdrant_client.create_collection(
                 collection_name=collection_name,
                 vectors_config=VectorParams(
