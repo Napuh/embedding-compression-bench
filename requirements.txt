@@ -1,0 +1,9 @@
+mteb==1.18.8
+einops==0.8.0
+numpy==2.1.2
+tiktoken==0.8.0
+torch==2.5.0
+ml_dtypes==0.5.0
+qdrant-client==1.12.1
+scikit-learn==1.5.2
+PyYAML==6.0.2

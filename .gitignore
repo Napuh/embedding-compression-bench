@@ -1,3 +1,9 @@
+# Results folder
+results/
+
+# linters
+.ruff_cache/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

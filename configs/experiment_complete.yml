@@ -1,0 +1,235 @@
+model_name: "BAAI/bge-small-en-v1.5"
+
+tasks:
+  AppsRetrieval
+  CodeFeedbackMT
+  CosQA
+  StackOverflowQA
+  SyntheticText2SQL
+  AILACasedocs
+  AILAStatutes
+  ARCChallenge
+  ArguAna
+  ClimateFEVERHardNegatives
+  CQADupstackAndroidRetrieval
+  CQADupstackEnglishRetrieval
+  CQADupstackGamingRetrieval
+  CQADupstackGisRetrieval
+  CQADupstackMathematicaRetrieval
+  CQADupstackPhysicsRetrieval
+  CQADupstackProgrammersRetrieval
+  CQADupstackStatsRetrieval
+  CQADupstackTexRetrieval
+  CQADupstackUnixRetrieval
+  CQADupstackWebmastersRetrieval
+  CQADupstackWordpressRetrieval
+  DBPediaHardNegatives
+  FaithDial
+  FeedbackQARetrieval
+  FEVERHardNegatives
+  FiQA2018
+  HagridRetrieval
+  HellaSwag
+  HotpotQAHardNegatives
+  LegalBenchConsumerContractsQA
+  LegalBenchCorporateLobbying
+  LegalSummarization
+  LEMBNarrativeQARetrieval
+  LEMBNeedleRetrieval
+  LEMBPasskeyRetrieval
+  LEMBQMSumRetrieval
+  LEMBSummScreenFDRetrieval
+  LEMBWikimQARetrieval
+  LitSearchRetrieval
+  MedicalQARetrieval
+  MLQuestions
+  MSMARCOHardNegatives
+  NarrativeQARetrieval
+  NFCorpus
+  NQHardNegatives
+  PIQA
+  Quail
+  QuoraRetrieval
+  QuoraRetrievalHardNegatives
+  RARbCode
+  RARbMath
+  SCIDOCS
+  SciFact
+  SIQA
+  SpartQA
+  TempReasonL1
+  TempReasonL2Context
+  TempReasonL2Fact
+  TempReasonL2Pure
+  TempReasonL3Context
+  TempReasonL3Fact
+  TempReasonL3Pure
+  TopiOCQAHardNegatives
+  Touche2020Retrievalv"
+  TRECCOVID
+  WinoGrande
+
+experiments:
+  - name: float32
+    quantization_type: FLOAT32
+    pca_config: null
+
+  - name: float16
+    quantization_type: FLOAT16
+    pca_config: null
+
+  - name: bfloat16
+    quantization_type: BFLOAT16
+    pca_config: null
+
+  - name: float8_e4m3
+    quantization_type: FLOAT8_E4M3
+    pca_config: null
+
+  - name: float8_e5m2
+    quantization_type: FLOAT8_E5M2
+    pca_config: null
+
+  - name: float4_e2m1
+    quantization_type: FLOAT4_E2M1
+    pca_config: null
+
+  - name: binary
+    quantization_type: BINARY
+    pca_config: null
+
+  - name: int8
+    quantization_type: INT8
+    pca_config: null
+
+  - name: float32_25PCA
+    quantization_type: FLOAT32
+    pca_config: 0.25
+
+  - name: float32_50PCA
+    quantization_type: FLOAT32
+    pca_config: 0.5
+
+  - name: float32_75PCA
+    quantization_type: FLOAT32
+    pca_config: 0.75
+
+  - name: float32_90PCA
+    quantization_type: FLOAT32
+    pca_config: 0.9
+
+  - name: float16_25PCA
+    quantization_type: FLOAT16
+    pca_config: 0.25
+
+  - name: float16_50PCA
+    quantization_type: FLOAT16
+    pca_config: 0.5
+
+  - name: float16_75PCA
+    quantization_type: FLOAT16
+    pca_config: 0.75
+
+  - name: float16_90PCA
+    quantization_type: FLOAT16
+    pca_config: 0.9
+
+  - name: float16_100PCA
+    quantization_type: FLOAT16
+    pca_config: 1.0
+
+  - name: bfloat16_25PCA
+    quantization_type: BFLOAT16
+    pca_config: 0.25
+
+  - name: bfloat16_50PCA
+    quantization_type: BFLOAT16
+    pca_config: 0.5
+
+  - name: bfloat16_75PCA
+    quantization_type: BFLOAT16
+    pca_config: 0.75
+
+  - name: bfloat16_90PCA
+    quantization_type: BFLOAT16
+    pca_config: 0.9
+
+  - name: float8_e4m3_25PCA
+    quantization_type: FLOAT8_E4M3
+    pca_config: 0.25
+
+  - name: float8_e4m3_50PCA
+    quantization_type: FLOAT8_E4M3
+    pca_config: 0.5
+
+  - name: float8_e4m3_75PCA
+    quantization_type: FLOAT8_E4M3
+    pca_config: 0.75
+
+  - name: float8_e4m3_90PCA
+    quantization_type: FLOAT8_E4M3
+    pca_config: 0.9
+
+  - name: float8_e5m2_25PCA
+    quantization_type: FLOAT8_E5M2
+    pca_config: 0.25
+
+  - name: float8_e5m2_50PCA
+    quantization_type: FLOAT8_E5M2
+    pca_config: 0.5
+
+  - name: float8_e5m2_75PCA
+    quantization_type: FLOAT8_E5M2
+    pca_config: 0.75
+
+  - name: float8_e5m2_90PCA
+    quantization_type: FLOAT8_E5M2
+    pca_config: 0.9
+
+  - name: float4_e2m1_25PCA
+    quantization_type: FLOAT4_E2M1
+    pca_config: 0.25
+
+  - name: float4_e2m1_50PCA
+    quantization_type: FLOAT4_E2M1
+    pca_config: 0.5
+
+  - name: float4_e2m1_75PCA
+    quantization_type: FLOAT4_E2M1
+    pca_config: 0.75
+
+  - name: float4_e2m1_90PCA
+    quantization_type: FLOAT4_E2M1
+    pca_config: 0.9
+
+  - name: binary_25PCA
+    quantization_type: BINARY
+    pca_config: 0.25
+
+  - name: binary_50PCA
+    quantization_type: BINARY
+    pca_config: 0.5
+
+  - name: binary_75PCA
+    quantization_type: BINARY
+    pca_config: 0.75
+
+  - name: binary_90PCA
+    quantization_type: BINARY
+    pca_config: 0.9
+
+  - name: int8_25PCA
+    quantization_type: INT8
+    pca_config: 0.25
+
+  - name: int8_50PCA
+    quantization_type: INT8
+    pca_config: 0.5
+
+  - name: int8_75PCA
+    quantization_type: INT8
+    pca_config: 0.75
+
+  - name: int8_90PCA
+    quantization_type: INT8
+    pca_config: 0.9
