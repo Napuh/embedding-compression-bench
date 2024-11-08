@@ -1,4 +1,4 @@
-mteb==1.18.8
+mteb==1.19.2
 einops==0.8.0
 numpy==2.1.2
 tiktoken==0.8.0
