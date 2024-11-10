@@ -24,6 +24,7 @@ class EmbeddingEngine:
         device: str = "cuda",
         benchmark: Optional[str] = None,
         count_queries: bool = False,
+        cache_location: str = ":memory:",
     ):
         self.model: SentenceTransformer = torch.compile(
             SentenceTransformer(model_name, device=device)
@@ -34,9 +35,7 @@ class EmbeddingEngine:
         self.tokenizer = tiktoken.encoding_for_model("gpt-4o")
         self.model_card_data = ""
         self.benchmark = benchmark
-        self.qdrant_client = QdrantClient(
-            url="localhost"
-        )  # TODO: esto puede ser location=:memory:
+        self.qdrant_client = QdrantClient(cache_location)
         self.collection_stats = {}  # Store min/max values per collection
         self.count_queries = count_queries
 

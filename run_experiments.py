@@ -17,13 +17,14 @@ def run_experiments(
     batch_size: int = 32,
     output_dir: str = "",
     rerun_existing: bool = False,
+    cache_location: str = ":memory:",
 ) -> Dict[str, Any]:
 
     if not output_dir:
         output_dir = f"results/{model_name}"
 
     results = {}
-    model = EmbeddingEngine(model_name=model_name)
+    model = EmbeddingEngine(model_name=model_name, cache_location=cache_location)
 
     for experiment in experiment_configs:
         # Load existing results if present
@@ -95,6 +96,9 @@ if __name__ == "__main__":
         default="configs/experiment.yml",
         help="Path to config file",
     )
+    parser.add_argument(
+        "--cache-location", type=str, default=":memory:", help="Cache location"
+    )
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -104,4 +108,5 @@ if __name__ == "__main__":
         model_name=config["model_name"],
         tasks=config["tasks"],
         experiment_configs=experiment_configs,
+        cache_location=args.cache_location,
     )
