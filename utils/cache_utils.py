@@ -3,7 +3,7 @@ import hashlib
 import time
 
 from qdrant_client import QdrantClient
-from qdrant_client.http.models import Distance, VectorParams
+from qdrant_client.http.models import Distance, PointStruct, VectorParams
 from sentence_transformers import SentenceTransformer
 
 
@@ -40,39 +40,47 @@ def should_use_cache(
         "Quisque viverra mauris ut massa euismod, ut luctus arcu aliquam. In lacinia dui ac eleifend sodales. Phasellus eleifend mollis neque at hendrerit. Proin lacinia vitae arcu eget placerat. Donec aliquet, elit a pellentesque rhoncus, quam neque interdum risus, id malesuada dolor nulla ut justo. Integer pretium est ut malesuada condimentum. Sed sed elit ut est gravida mattis id vitae tellus. Integer faucibus elementum mattis. Sed porta imperdiet augue non dapibus. Duis ac mi nec massa luctus porta. Mauris congue lectus ut tortor molestie, a mollis libero sollicitudin. Curabitur magna odio, volutpat at nulla ullamcorper, sollicitudin luctus risus. Maecenas consequat eros in finibus volutpat. Maecenas at lacus dignissim, sagittis arcu sed, facilisis arcu."
         for i in range(benchmark_size)
     ]
-
-    # Calculate hashes
+    # Calculate hashes for all sentences
     sentence_hashes = [
         int(hashlib.md5(s.encode()).hexdigest()[:16], 16) for s in sentences
     ]
 
     # Setup temporary Qdrant collection
-    qdrant_client = QdrantClient(location)
-    try:
-        qdrant_client.create_collection(
-            collection_name=collection_name,
-            vectors_config=VectorParams(
-                size=model.get_sentence_embedding_dimension(),
-                distance=Distance.COSINE,
-                datatype="float32",
-            ),
-        )
-    except Exception:
-        # Collection may already exist
-        pass
+    qdrant_client = QdrantClient(location, prefer_grpc=True)
+    if qdrant_client.collection_exists(collection_name):
+        qdrant_client.delete_collection(collection_name)
 
-    # Generate and store embeddings
-    embeddings = []
+    # Create new collection with indexing disabled
+    qdrant_client.create_collection(
+        collection_name=collection_name,
+        vectors_config=VectorParams(
+            size=model.get_sentence_embedding_dimension(),
+            distance=Distance.COSINE,
+            datatype="float32",
+        ),
+    )
+
+    # Upload vectors in batches
+    start_time = time.time()
     for i in range(0, len(sentences), batch_size):
-        batch = sentences[i : i + batch_size]
-        batch_embeddings = model.encode(batch)
-        embeddings.extend(batch_embeddings)
+        batch_sentences = sentences[i : i + batch_size]
+        batch_embeddings = model.encode(batch_sentences)
 
-    # Store in Qdrant
-    points = [
-        {"id": h, "vector": e.tolist()} for h, e in zip(sentence_hashes, embeddings)
-    ]
-    qdrant_client.upsert(collection_name=collection_name, points=points)
+        points = [
+            PointStruct(
+                id=sentence_hashes[idx],
+                vector=embedding.tolist(),
+                payload={"metadata": f"point_{idx}"},
+            )
+            for idx, embedding in enumerate(batch_embeddings, start=i)
+        ]
+
+        qdrant_client.upsert(collection_name=collection_name, points=points)
+
+    while True:
+        if qdrant_client.get_collection(collection_name).status == "green":
+            break
+        time.sleep(1)
 
     # Benchmark direct embedding time
     start_time = time.time()
@@ -81,20 +89,20 @@ def should_use_cache(
         _ = model.encode(batch)
     embedding_time = time.time() - start_time
 
-    # Benchmark cache retrieval time
+    # Benchmark cache retrieval time using embedding engine style retrieval
     start_time = time.time()
-    for i in range(0, len(sentence_hashes), batch_size):
-        batch_hashes = sentence_hashes[i : i + batch_size]
-        _ = qdrant_client.retrieve(
+    for batch_start in range(0, len(sentences), batch_size):
+        batch_end = min(batch_start + batch_size, len(sentences))
+        batch_hashes = sentence_hashes[batch_start:batch_end]
+
+        qdrant_client.retrieve(
             collection_name=collection_name, ids=batch_hashes, with_vectors=True
         )
+
     cache_time = time.time() - start_time
 
     # Cleanup
-    try:
-        qdrant_client.delete_collection(collection_name)
-    except Exception:
-        pass
+    qdrant_client.delete_collection(collection_name)
 
     # Return True if cache is faster
     return cache_time < embedding_time
