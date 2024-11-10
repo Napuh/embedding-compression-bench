@@ -134,10 +134,6 @@ experiments:
     quantization_type: FLOAT16
     pca_config: 0.9
 
-  - name: float16_100PCA
-    quantization_type: FLOAT16
-    pca_config: 1.0
-
   - name: bfloat16_25PCA
     quantization_type: BFLOAT16
     pca_config: 0.25
