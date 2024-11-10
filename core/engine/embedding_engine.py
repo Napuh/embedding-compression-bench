@@ -9,6 +9,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.http.models import Distance, PointStruct, VectorParams
 from sentence_transformers import SentenceTransformer
+from sentence_transformers.quantization import quantize_embeddings
 from sklearn.decomposition import PCA
 
 from core.configs import PCAConfig, QuantizationType
@@ -43,20 +44,42 @@ class EmbeddingEngine:
         self.model_card_data = self.model.model_card_data
         self.similarity_fn_name = self.model.similarity_fn_name
 
+        # Initialize quantization ranges for INT8
+        self.int8_ranges = None
         if benchmark:
             self._create_collection(benchmark)
 
-            if pca_config.n_components:
+            if pca_config and pca_config.n_components:
                 self._fit_pca()
+
+            if quant_type == QuantizationType.INT8:
+                self._init_int8_ranges()
+
+    def _init_int8_ranges(self) -> None:
+        """Initialize ranges for INT8 quantization using calibration embeddings"""
+        calibration_embeddings = self._return_all_embeddings(self.benchmark)
+        if self.pca_config and self.pca:
+            calibration_embeddings = self.pca.transform(calibration_embeddings)
+        # Calculate ranges (min, max) for each dimension
+        self.int8_ranges = np.vstack(
+            [
+                np.min(calibration_embeddings, axis=0),
+                np.max(calibration_embeddings, axis=0),
+            ]
+        )
 
     def set_pca_config(self, pca_config: PCAConfig) -> None:
         """Change the current PCA configuration."""
         self.pca_config = pca_config
 
-        if pca_config.n_components:
+        if pca_config and pca_config.n_components:
             self._fit_pca()
+            if self.quant_type == QuantizationType.INT8:
+                self._init_int8_ranges()
         else:
             self.pca = None
+            if self.quant_type == QuantizationType.INT8:
+                self._init_int8_ranges()
 
     def _fit_pca(self) -> None:
         """Fit PCA to the benchmark collection."""
@@ -84,17 +107,20 @@ class EmbeddingEngine:
         # explained_variance = sum(self.pca.explained_variance_ratio_) * 100
         # print(f"Total explained variance: {explained_variance:.2f}%")
 
-    def _return_all_embeddings(self, collection_name: str) -> np.ndarray:
+    def _return_all_embeddings(self, collection_name: str, limit=250_000) -> np.ndarray:
         """Return all embeddings from a collection."""
         embeddings = []
         offset = None
         batch_size = 1000  # Process 1000 vectors at a time
+        total_vectors = 0
 
-        while True:
+        while total_vectors < limit:
+            # Adjust batch size for last iteration if needed
+            current_batch_size = min(batch_size, limit - total_vectors)
 
             points, next_offset = self.qdrant_client.scroll(
                 collection_name=collection_name,
-                limit=batch_size,
+                limit=current_batch_size,
                 offset=offset,
                 with_vectors=True,
             )
@@ -105,6 +131,7 @@ class EmbeddingEngine:
             # Process this batch
             batch_embeddings = np.vstack([np.array(p.vector) for p in points])
             embeddings.append(batch_embeddings)
+            total_vectors += len(points)
 
             # Update offset for next iteration
             if next_offset is None:
@@ -130,11 +157,15 @@ class EmbeddingEngine:
     def set_quant_type(self, quant_type: QuantizationType) -> None:
         """Change the current quantization type being used."""
         self.quant_type = quant_type
+        if quant_type == QuantizationType.INT8 and self.benchmark:
+            self._init_int8_ranges()
 
     def set_benchmark(self, benchmark: str) -> None:
         """Change the current benchmark being used."""
         self.benchmark = benchmark
         self._create_collection(benchmark)
+        if self.quant_type == QuantizationType.INT8:
+            self._init_int8_ranges()
 
     def _calculate_collection_stats(self, collection_name: str) -> tuple[float, float]:
         """Calculate and cache min/max values for a collection."""
@@ -201,13 +232,9 @@ class EmbeddingEngine:
         elif self.quant_type == QuantizationType.INT8:
             if not self.benchmark:
                 raise ValueError("Benchmark is required for INT8 quantization")
-
-            global_min, global_max = self._calculate_collection_stats(self.benchmark)
-            if global_min is not None and global_max is not None:
-                # Scale to int8 range [0, 255]
-                x_scaled = 255 * (x - global_min) / (global_max - global_min)
-                x_int8 = np.clip(np.round(x_scaled), 0, 255).astype(np.int8)
-                return x_int8.astype(np.float32)
+            return quantize_embeddings(
+                x, precision="uint8", ranges=self.int8_ranges
+            ).astype(np.float32)
 
         elif self.quant_type == QuantizationType.BINARY:
             # por el momento esto se almacena como int8 pero es binario (0, 1)
@@ -216,79 +243,82 @@ class EmbeddingEngine:
         return x
 
     def encode(self, sentences: list[str], **kwargs: Any) -> np.ndarray:
-
-        # TODO: aqui llega todo a la vez, hay que dividir en batches porque si no no se sube nada al qdrant hasta que se acabe de procesar absolutamente todo
+        BATCH_SIZE = 1024
+        all_embeddings = []
 
         if self.count_queries:
             self.query_count += len(sentences)
-
             for sentence in sentences:
                 self.token_count += len(self.tokenizer.encode(sentence))
 
-        # Calculate hashes for all sentences
-        sentence_hashes = [
-            int(hashlib.sha256(s.encode()).hexdigest()[:16], 16) for s in sentences
-        ]
+        # Process sentences in batches
+        for batch_start in range(0, len(sentences), BATCH_SIZE):
+            batch_end = min(batch_start + BATCH_SIZE, len(sentences))
+            batch_sentences = sentences[batch_start:batch_end]
 
-        embeddings = []
-        uncached_sentences = []
-        uncached_indices = []
+            # Calculate hashes for batch sentences using faster MD5
+            batch_hashes = [
+                int(hashlib.md5(s.encode()).hexdigest()[:16], 16)
+                for s in batch_sentences
+            ]
 
-        # Try to get embeddings from cache
-        if self.benchmark:
-            search_results = self.qdrant_client.retrieve(
-                collection_name=self.benchmark, ids=sentence_hashes, with_vectors=True
-            )
+            batch_embeddings = []
+            uncached_sentences = []
+            uncached_indices = []
 
-            # Create mapping of found embeddings
-            found_embeddings = {r.id: np.array(r.vector) for r in search_results}
+            # Try to get embeddings from cache
+            if self.benchmark:
+                search_results = self.qdrant_client.retrieve(
+                    collection_name=self.benchmark, ids=batch_hashes, with_vectors=True
+                )
 
-            # Process sentences in order
-            for i, sentence_hash in enumerate(sentence_hashes):
-                if sentence_hash in found_embeddings:
-                    embeddings.append(found_embeddings[sentence_hash])
-                else:
-                    uncached_sentences.append(sentences[i])
-                    uncached_indices.append(i)
-        else:
-            uncached_sentences = sentences
-            uncached_indices = list(range(len(sentences)))
+                # Create mapping of found embeddings
+                found_embeddings = {r.id: np.array(r.vector) for r in search_results}
 
-        # Calculate embeddings for uncached sentences
-        if uncached_sentences:
-            with torch.no_grad():
-                batch_embeddings = self.model.encode(uncached_sentences, **kwargs)
-                if isinstance(batch_embeddings, torch.Tensor):
-                    batch_embeddings = batch_embeddings.cpu().numpy()
-                else:
-                    batch_embeddings = np.array(batch_embeddings)
+                # Process sentences in order
+                for i, sentence_hash in enumerate(batch_hashes):
+                    if sentence_hash in found_embeddings:
+                        batch_embeddings.append(found_embeddings[sentence_hash])
+                    else:
+                        uncached_sentences.append(batch_sentences[i])
+                        uncached_indices.append(i)
+            else:
+                uncached_sentences = batch_sentences
+                uncached_indices = list(range(len(batch_sentences)))
 
-                # Store in cache if benchmark is set
-                if self.benchmark:
-                    # Process in batches of 1000
-                    batch_size = 1000
-                    for i in range(0, len(uncached_indices), batch_size):
-                        batch_indices = uncached_indices[i : i + batch_size]
-                        batch_embs = batch_embeddings[i : i + batch_size]
+            # Calculate embeddings for uncached sentences
+            if uncached_sentences:
+                with torch.no_grad():
+                    new_embeddings = self.model.encode(uncached_sentences, **kwargs)
+                    if isinstance(new_embeddings, torch.Tensor):
+                        new_embeddings = new_embeddings.cpu().numpy()
+                    else:
+                        new_embeddings = np.array(new_embeddings)
 
+                    # Store in cache if benchmark is set
+                    if self.benchmark:
                         points = [
-                            PointStruct(id=sentence_hashes[idx], vector=emb.tolist())
-                            for idx, emb in zip(batch_indices, batch_embs)
+                            PointStruct(id=batch_hashes[idx], vector=emb.tolist())
+                            for idx, emb in zip(uncached_indices, new_embeddings)
                         ]
                         self.qdrant_client.upsert(
                             collection_name=self.benchmark, points=points
                         )
 
-                # Insert uncached embeddings in correct positions
-                for i, emb in zip(uncached_indices, batch_embeddings):
-                    while len(embeddings) < i:
-                        embeddings.append(None)  # Pad with None if needed
-                    embeddings.insert(i, emb)
+                    # Insert uncached embeddings in correct positions
+                    for i, emb in zip(uncached_indices, new_embeddings):
+                        while len(batch_embeddings) < i:
+                            batch_embeddings.append(None)  # Pad with None if needed
+                        batch_embeddings.insert(i, emb)
 
-        embeddings = np.stack([e for e in embeddings if e is not None])
+            batch_embeddings = np.stack([e for e in batch_embeddings if e is not None])
 
-        # Apply PCA if configured, before quantization
-        if self.pca_config and self.pca:
-            embeddings = self.pca.transform(embeddings)
+            # Apply PCA if configured, before quantization
+            if self.pca_config and self.pca:
+                batch_embeddings = self.pca.transform(batch_embeddings)
 
-        return self.quantize_tensor(embeddings)
+            batch_embeddings = self.quantize_tensor(batch_embeddings)
+            all_embeddings.append(batch_embeddings)
+
+        # Concatenate all batches
+        return np.concatenate(all_embeddings, axis=0)
