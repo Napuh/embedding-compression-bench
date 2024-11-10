@@ -1,46 +1,17 @@
 import argparse
 import json
 import time
-from pathlib import Path
 from typing import Any, Dict
 
 import numpy as np
-import yaml
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from qdrant_client.http.models import Datatype as QdrantDatatype
 from qdrant_client.http.models import Distance, VectorParams
 
-from core.configs import ExperimentConfig, PCAConfig, QuantizationType
-
-
-def load_config(config_path: str) -> Dict[str, Any]:
-    with open(config_path, "r") as f:
-        return yaml.safe_load(f)
-
-
-def create_experiment_configs(experiments_config: list) -> list[ExperimentConfig]:
-
-    # Filter for Qdrant-supported quantization types
-    supported_types = {
-        QuantizationType.FLOAT32,
-        QuantizationType.FLOAT16,
-        QuantizationType.INT8,
-        QuantizationType.BINARY,
-    }
-
-    experiment_configs = []
-    for exp in experiments_config:
-        quant_type = QuantizationType[exp["quantization_type"]]
-        if quant_type in supported_types:
-            experiment_configs.append(
-                ExperimentConfig(
-                    exp["name"],
-                    quant_type,
-                    PCAConfig(exp["pca_config"]),
-                )
-            )
-    return experiment_configs
+from core.configs import ExperimentConfig, QuantizationType
+from utils.config_utils import create_experiment_configs, load_config
+from utils.experiment_utils import save_experiment_results
 
 
 def generate_random_embeddings(
@@ -70,6 +41,73 @@ def calculate_memory_size(
     return memory_bytes / (1024**3)  # Convert to GB
 
 
+def get_quantization_params(experiment: ExperimentConfig):
+    """Get Qdrant quantization parameters based on experiment configuration."""
+    params = {
+        QuantizationType.FLOAT32: (
+            QdrantDatatype.FLOAT32,
+            np.float32,
+            Distance.COSINE,
+            None,
+            None,
+        ),
+        QuantizationType.FLOAT16: (
+            QdrantDatatype.FLOAT16,
+            np.float16,
+            Distance.COSINE,
+            None,
+            None,
+        ),
+        QuantizationType.INT8: (
+            QdrantDatatype.UINT8,
+            np.uint8,
+            Distance.COSINE,
+            None,
+            None,
+        ),
+        QuantizationType.BINARY: (
+            QdrantDatatype.FLOAT32,
+            np.float32,
+            Distance.DOT,
+            models.SearchParams(
+                quantization=models.QuantizationSearchParams(
+                    ignore=False, rescore=False
+                )
+            ),
+            models.BinaryQuantization(
+                binary=models.BinaryQuantizationConfig(always_ram=True)
+            ),
+        ),
+    }
+    return params[experiment.quantization_type]
+
+
+def calculate_payload_sizes(
+    client: QdrantClient, collection_name: str, batch_size: int, embeddings: np.ndarray
+) -> tuple[float, float]:
+    """Calculate average payload sizes for upload and retrieval."""
+    # Calculate upload request size
+    sample_request = {
+        "batch": {
+            "ids": list(range(batch_size)),
+            "payloads": [{"metadata": f"point_{i}"} for i in range(batch_size)],
+            "vectors": [emb.tolist() for emb in embeddings],
+        }
+    }
+    avg_upload_size = len(json.dumps(sample_request).encode()) / batch_size
+
+    # Calculate point payload size
+    points = client.scroll(
+        collection_name=collection_name, with_vectors=True, limit=batch_size
+    )[0]
+    total_size = sum(
+        len(json.dumps(p.model_dump(mode="json")).encode()) for p in points
+    )
+    avg_point_size = total_size / len(points) if points else 0
+
+    return avg_upload_size, avg_point_size
+
+
 def run_qdrant_experiments(
     model_name: str,
     experiment_configs: list[ExperimentConfig],
@@ -83,8 +121,6 @@ def run_qdrant_experiments(
 
     if not output_dir:
         output_dir = f"results/qdrant/{model_name}"
-
-    results = {}
 
     # Initialize Qdrant client
     client = QdrantClient(location, prefer_grpc=True)
@@ -110,50 +146,18 @@ def run_qdrant_experiments(
         )
         print(f"Estimated memory requirement: {memory_size_gb:.2f} GB")
 
-        # Map quantization type to Qdrant datatype and numpy dtype
-        datatype = QdrantDatatype.FLOAT32  # Default
-        dtype = np.float32  # Default
-        distance = Distance.COSINE  # Default
-        search_params = None  # Default
-        quantization_config = None
-
-        if experiment.quantization_type == QuantizationType.FLOAT16:
-            datatype = QdrantDatatype.FLOAT16
-            dtype = np.float16
-        elif experiment.quantization_type == QuantizationType.INT8:
-            datatype = QdrantDatatype.UINT8
-            dtype = np.uint8
-        elif experiment.quantization_type == QuantizationType.BINARY:
-            # Use scalar quantization config for binary quantization
-            distance = Distance.DOT
-            search_params = models.SearchParams(
-                quantization=models.QuantizationSearchParams(
-                    ignore=False,
-                    rescore=False,
-                )
-            )
-            quantization_config = models.BinaryQuantization(
-                binary=models.BinaryQuantizationConfig(always_ram=True)
-            )
-
-        # Generate a small batch of embeddings to calculate payload size
-        sample_embeddings = generate_random_embeddings(
-            1, current_vector_dim, dtype=dtype
+        # Get quantization parameters
+        qdrant_dtype, numpy_dtype, distance_type, search_params, quantization_config = (
+            get_quantization_params(experiment)
         )
-        sample_vector = sample_embeddings[0].tolist()
-        sample_request = {
-            "batch": {
-                "ids": [0],
-                "payloads": [{"metadata": "point_0"}],
-                "vectors": [sample_vector],
-            }
-        }
-        payload_size = len(json.dumps(sample_request).encode("utf-8"))
-        print(f"Sample request payload size: {payload_size} bytes")
 
-        # Create collection
-        vector_params = VectorParams(
-            size=current_vector_dim, distance=distance, datatype=datatype
+        # Generate sample embeddings for payload size calculation
+        sample_embeddings = generate_random_embeddings(
+            batch_size, current_vector_dim, dtype=numpy_dtype
+        )
+
+        avg_request_size, avg_payload_size = calculate_payload_sizes(
+            client, collection_name, batch_size, sample_embeddings
         )
 
         # Delete collection if exists
@@ -163,12 +167,12 @@ def run_qdrant_experiments(
         # Create new collection with indexing disabled
         client.create_collection(
             collection_name=collection_name,
-            vectors_config=vector_params,
+            vectors_config=VectorParams(
+                size=current_vector_dim, distance=distance_type, datatype=qdrant_dtype
+            ),
             quantization_config=quantization_config,
             on_disk_payload=False,
-            optimizers_config=models.OptimizersConfigDiff(
-                indexing_threshold=0,
-            ),
+            optimizers_config=models.OptimizersConfigDiff(indexing_threshold=0),
         )
 
         # Upload vectors in batches, generating them on the fly
@@ -179,10 +183,9 @@ def run_qdrant_experiments(
             # Generate batch of embeddings
             current_batch_size = min(batch_size, num_vectors - i)
             batch_embeddings = generate_random_embeddings(
-                current_batch_size, current_vector_dim, dtype=dtype
+                current_batch_size, current_vector_dim, dtype=numpy_dtype
             )
 
-            # Create points with minimal payload
             points = [
                 models.PointStruct(
                     id=idx,
@@ -209,16 +212,15 @@ def run_qdrant_experiments(
         # Wait for collection status to become green
         print("Waiting for collection to be ready...")
         while True:
-            collection_info = client.get_collection(collection_name)
-            if collection_info.status == "green":
+            if client.get_collection(collection_name).status == "green":
                 print("Collection is ready!")
                 break
-            time.sleep(1)  # Wait 1 second before checking again
+            time.sleep(1)
 
         # Measure retrieval speed 5 times
         print("Measuring retrieval speed (5 runs)...")
         query_embeddings = generate_random_embeddings(
-            num_queries, current_vector_dim, dtype=dtype
+            num_queries, current_vector_dim, dtype=numpy_dtype
         )
 
         all_query_times = []
@@ -240,59 +242,31 @@ def run_qdrant_experiments(
                 all_query_times.append(query_time)
 
         # Calculate percentiles
-        all_query_times.sort()
-        p50 = np.percentile(all_query_times, 50)
-        p90 = np.percentile(all_query_times, 90)
-        p95 = np.percentile(all_query_times, 95)
-        p99 = np.percentile(all_query_times, 99)
-
-        # Calculate mean retrieval time
+        p50, p90, p95, p99 = np.percentile(all_query_times, [50, 90, 95, 99])
         mean_retrieval_time = np.mean(all_query_times)
 
-        # Calculate queries per second - divide 1 by mean retrieval time since that's queries/second
-        queries_per_second = 1 / mean_retrieval_time
-
-        # Measure payload size
-        sample_point = client.retrieve(
-            collection_name=collection_name,
-            ids=[0],
-            with_vectors=True,
-            with_payload=True,
-        )[0]
-
-        payload = sample_point.model_dump(mode="json")
-        payload_size = len(json.dumps(payload).encode("utf-8"))
-
-        # Get collection info
-        collection_info = client.get_collection(collection_name)
-
-        results[experiment.name] = {
+        # Save results for this experiment
+        experiment_results = {
             "num_vectors": num_vectors,
             "vector_dim": current_vector_dim,
             "theoretical_memory_gb": memory_size_gb,
             "upload_duration_seconds": upload_duration,
-            "points_per_second": num_vectors / upload_duration,
+            "uploaded_points_per_second": num_vectors / upload_duration,
             "mean_retrieval_time": mean_retrieval_time,
             "retrieval_p50": p50,
             "retrieval_p90": p90,
             "retrieval_p95": p95,
             "retrieval_p99": p99,
-            "queries_per_second": queries_per_second,
-            "payload_size_bytes": payload_size,
-            "request_payload_size_bytes": payload_size,
-            "collection_info": collection_info.model_dump(),
+            "queries_per_second": 1 / mean_retrieval_time,
+            "avg_payload_size_bytes": avg_payload_size,
+            "avg_request_payload_size_bytes": avg_request_size,
+            "collection_info": client.get_collection(collection_name).model_dump(),
         }
 
-        # Save results after each experiment
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
-        with open(f"{output_dir}/results_{experiment.name}.json", "w") as f:
-            json.dump(results[experiment.name], f, indent=2)
+        save_experiment_results(output_dir, experiment.name, experiment_results)
 
-        # Delete collection after experiment
         print(f"Deleting collection {collection_name}...")
         client.delete_collection(collection_name)
-
-    return results
 
 
 if __name__ == "__main__":
@@ -315,7 +289,7 @@ if __name__ == "__main__":
     config = load_config(args.config)
     experiment_configs = create_experiment_configs(config["experiments"])
 
-    results = run_qdrant_experiments(
+    run_qdrant_experiments(
         model_name=config["model_name"],
         experiment_configs=experiment_configs,
         num_vectors=args.num_vectors,

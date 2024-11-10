@@ -1,32 +1,13 @@
 import argparse
-import json
 import time
-from pathlib import Path
 from typing import Any, Dict
 
 import mteb
-import yaml
 
-from core.configs import ExperimentConfig, PCAConfig, QuantizationType
+from core.configs import ExperimentConfig
 from core.engine import EmbeddingEngine
-
-
-def load_config(config_path: str) -> Dict[str, Any]:
-    with open(config_path, "r") as f:
-        return yaml.safe_load(f)
-
-
-def create_experiment_configs(experiments_config: list) -> list[ExperimentConfig]:
-    experiment_configs = []
-    for exp in experiments_config:
-        experiment_configs.append(
-            ExperimentConfig(
-                exp["name"],
-                QuantizationType[exp["quantization_type"]],
-                PCAConfig(exp["pca_config"]),
-            )
-        )
-    return experiment_configs
+from utils.config_utils import create_experiment_configs, load_config
+from utils.experiment_utils import load_existing_results, save_experiment_results
 
 
 def run_experiments(
@@ -42,18 +23,17 @@ def run_experiments(
         output_dir = f"results/{model_name}"
 
     results = {}
-
     model = EmbeddingEngine(model_name=model_name)
 
     for experiment in experiment_configs:
-
         # Load existing results if present
-        result_path = Path(output_dir) / f"results_{experiment.name}.json"
-        if result_path.exists() and not rerun_existing:
-            with open(result_path) as f:
-                results[experiment.name] = json.load(f)
-                ndcg_scores = results[experiment.name]["scores"]
-                start_time = time.time() - results[experiment.name]["time"]
+        existing_results = load_existing_results(
+            output_dir, experiment.name, rerun_existing
+        )
+        if existing_results:
+            results[experiment.name] = existing_results
+            ndcg_scores = results[experiment.name]["scores"]
+            start_time = time.time() - results[experiment.name]["time"]
         else:
             ndcg_scores = {}
             start_time = time.time()
@@ -94,18 +74,14 @@ def run_experiments(
                         test_set
                     ][0]["ndcg_at_10"]
 
-            duration = time.time() - start_time
-
             # Update results after each benchmark
             results[experiment.name] = {
                 "scores": ndcg_scores.copy(),
-                "time": duration,
+                "time": time.time() - start_time,
             }
-
-            # Save results after each benchmark
-            Path(output_dir).mkdir(parents=True, exist_ok=True)
-            with open(f"{output_dir}/results_{experiment.name}.json", "w") as f:
-                json.dump(results[experiment.name], f, indent=2)
+            save_experiment_results(
+                output_dir, experiment.name, results[experiment.name]
+            )
 
     return results
 
