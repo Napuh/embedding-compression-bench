@@ -42,6 +42,7 @@ class EmbeddingEngine:
         self.pca_config = pca_config
         self.model_card_data = self.model.model_card_data
         self.similarity_fn_name = self.model.similarity_fn_name
+        self.calibration_dataset = None
 
         # Initialize quantization ranges for INT8
         self.int8_ranges = None
@@ -54,9 +55,17 @@ class EmbeddingEngine:
             if quant_type == QuantizationType.INT8:
                 self._init_int8_ranges()
 
+    def set_calibration_dataset(self, calibration_dataset: str) -> None:
+        self.calibration_dataset = calibration_dataset
+
+    def _get_calibration_embeddings(self) -> np.ndarray:
+        if self.calibration_dataset:
+            return self._return_all_embeddings(self.calibration_dataset)
+        return self._return_all_embeddings(self.benchmark)
+
     def _init_int8_ranges(self) -> None:
         """Initialize ranges for INT8 quantization using calibration embeddings"""
-        calibration_embeddings = self._return_all_embeddings(self.benchmark)
+        calibration_embeddings = self._get_calibration_embeddings()
         if self.pca_config and self.pca:
             calibration_embeddings = self.pca.transform(calibration_embeddings)
         # Calculate ranges (min, max) for each dimension
@@ -66,6 +75,7 @@ class EmbeddingEngine:
                 np.max(calibration_embeddings, axis=0),
             ]
         )
+        # print(f"Calibration embeddings: {calibration_embeddings.shape}")
 
     def set_pca_config(self, pca_config: PCAConfig) -> None:
         """Change the current PCA configuration."""
@@ -156,15 +166,11 @@ class EmbeddingEngine:
     def set_quant_type(self, quant_type: QuantizationType) -> None:
         """Change the current quantization type being used."""
         self.quant_type = quant_type
-        if quant_type == QuantizationType.INT8 and self.benchmark:
-            self._init_int8_ranges()
 
     def set_benchmark(self, benchmark: str) -> None:
         """Change the current benchmark being used."""
         self.benchmark = benchmark
         self._create_collection(benchmark)
-        if self.quant_type == QuantizationType.INT8:
-            self._init_int8_ranges()
 
     def _calculate_collection_stats(self, collection_name: str) -> tuple[float, float]:
         """Calculate and cache min/max values for a collection."""

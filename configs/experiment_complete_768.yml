@@ -1,4 +1,4 @@
-model_name: "BAAI/bge-small-en-v1.5"
+model_name: "nomic-ai/nomic-embed-text-v1.5"
 
 tasks:
   - AppsRetrieval
@@ -101,6 +101,7 @@ experiments:
   - name: int8
     quantization_type: INT8
     pca_config: null
+    calibration_dataset: "MLQuestions"
 
   - name: float32_25PCA
     quantization_type: FLOAT32
@@ -217,15 +218,19 @@ experiments:
   - name: int8_25PCA
     quantization_type: INT8
     pca_config: 0.25
+    calibration_dataset: "MLQuestions"
 
   - name: int8_50PCA
     quantization_type: INT8
     pca_config: 0.5
+    calibration_dataset: "MLQuestions"
 
   - name: int8_75PCA
     quantization_type: INT8
     pca_config: 0.75
+    calibration_dataset: "MLQuestions"
 
   - name: int8_90PCA
     quantization_type: INT8
     pca_config: 0.9
+    calibration_dataset: "MLQuestions"

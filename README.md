@@ -50,7 +50,7 @@ docker-compose up -d
 
 2. Run experiments:
 ```bash
-python run_experiments.py --config configs/experiment.yml
+HF_DATASETS_TRUST_REMOTE_CODE=1 python run_experiments.py --config configs/experiment.yml
 ```
 
 3. Visualize results:
@@ -88,3 +88,5 @@ See `core/configs/pca_config.py` and `core/configs/quantization_type.py` to see 
 ## Results
 
 Results are stored in the `results/` directory, organized by model name. Each experiment generates a JSON file containing NDCG@10 scores for **each** benchmark. More metrics soon to be added.
+
+

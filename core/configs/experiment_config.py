@@ -9,3 +9,4 @@ class ExperimentConfig:
     name: str
     quantization_type: QuantizationType | None
     pca_config: PCAConfig | None
+    calibration_dataset: str | None = None

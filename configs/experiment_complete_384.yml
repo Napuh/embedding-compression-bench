@@ -2,15 +2,72 @@ model_name: "BAAI/bge-small-en-v1.5"
 
 tasks:
   - AppsRetrieval
+  - CodeFeedbackMT
+  - CosQA
+  - StackOverflowQA
+  - SyntheticText2SQL
+  - AILACasedocs
+  - AILAStatutes
   - ARCChallenge
   - ArguAna
+  - ClimateFEVERHardNegatives
+  - CQADupstackAndroidRetrieval
+  - CQADupstackEnglishRetrieval
+  - CQADupstackGamingRetrieval
+  - CQADupstackGisRetrieval
+  - CQADupstackMathematicaRetrieval
+  - CQADupstackPhysicsRetrieval
+  - CQADupstackProgrammersRetrieval
+  - CQADupstackStatsRetrieval
+  - CQADupstackTexRetrieval
+  - CQADupstackUnixRetrieval
+  - CQADupstackWebmastersRetrieval
+  - CQADupstackWordpressRetrieval
+  - DBPediaHardNegatives
+  - FaithDial
+  - FeedbackQARetrieval
+  - FEVERHardNegatives
+  - FiQA2018
+  - HagridRetrieval
+  - HellaSwag
+  - HotpotQAHardNegatives
   - LegalBenchConsumerContractsQA
   - LegalBenchCorporateLobbying
   - LegalSummarization
-  - HagridRetrieval
+  - LEMBNarrativeQARetrieval
+  - LEMBNeedleRetrieval
+  - LEMBPasskeyRetrieval
+  - LEMBQMSumRetrieval
+  - LEMBSummScreenFDRetrieval
+  - LEMBWikimQARetrieval
   - LitSearchRetrieval
   - MedicalQARetrieval
   - MLQuestions
+  - MSMARCOHardNegatives
+  - NarrativeQARetrieval
+  - NFCorpus
+  - NQHardNegatives
+  - PIQA
+  - Quail
+  - QuoraRetrieval
+  - QuoraRetrievalHardNegatives
+  - RARbCode
+  - RARbMath
+  - SCIDOCS
+  - SciFact
+  - SIQA
+  - SpartQA
+  - TempReasonL1
+  - TempReasonL2Context
+  - TempReasonL2Fact
+  - TempReasonL2Pure
+  - TempReasonL3Context
+  - TempReasonL3Fact
+  - TempReasonL3Pure
+  - TopiOCQAHardNegatives
+  - Touche2020Retrievalv"
+  - TRECCOVID
+  - WinoGrande
 
 experiments:
   - name: float32
@@ -44,6 +101,7 @@ experiments:
   - name: int8
     quantization_type: INT8
     pca_config: null
+    calibration_dataset: "MLQuestions"
 
   - name: float32_25PCA
     quantization_type: FLOAT32
@@ -160,40 +218,19 @@ experiments:
   - name: int8_25PCA
     quantization_type: INT8
     pca_config: 0.25
+    calibration_dataset: "MLQuestions"
 
   - name: int8_50PCA
     quantization_type: INT8
     pca_config: 0.5
+    calibration_dataset: "MLQuestions"
 
   - name: int8_75PCA
     quantization_type: INT8
     pca_config: 0.75
+    calibration_dataset: "MLQuestions"
 
   - name: int8_90PCA
-    quantization_type: INT8
-    pca_config: 0.9
-
-  - name: int8_calibration
-    quantization_type: INT8
-    pca_config: null
-    calibration_dataset: "MLQuestions"
-
-  - name: int8_25PCA_calibration
-    quantization_type: INT8
-    pca_config: 0.25
-    calibration_dataset: "MLQuestions"
-
-  - name: int8_50PCA_calibration
-    quantization_type: INT8
-    pca_config: 0.5
-    calibration_dataset: "MLQuestions"
-
-  - name: int8_75PCA_calibration
-    quantization_type: INT8
-    pca_config: 0.75
-    calibration_dataset: "MLQuestions"
-
-  - name: int8_90PCA_calibration
     quantization_type: INT8
     pca_config: 0.9
     calibration_dataset: "MLQuestions"

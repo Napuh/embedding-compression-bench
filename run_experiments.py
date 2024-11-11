@@ -55,6 +55,7 @@ def run_experiments(
             print(f"\tRunning benchmark: {benchmark}")
 
             model.set_benchmark(benchmark)
+            model.set_calibration_dataset(experiment.calibration_dataset)
             model.set_pca_config(experiment.pca_config)
 
             mteb_tasks = mteb.get_tasks(tasks=[benchmark], languages=["eng"])

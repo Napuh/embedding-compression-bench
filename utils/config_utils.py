@@ -33,6 +33,9 @@ def create_experiment_configs(
                     exp["name"],
                     quant_type,
                     PCAConfig(exp["pca_config"]),
+                    exp.get(
+                        "calibration_dataset"
+                    ),  # Get calibration dataset if present
                 )
             )
     return experiment_configs
