@@ -100,6 +100,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--cache-location", type=str, default=":memory:", help="Cache location"
     )
+    parser.add_argument(
+        "--batch-size", type=int, default=32, help="Batch size for encoding"
+    )
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -110,4 +113,5 @@ if __name__ == "__main__":
         tasks=config["tasks"],
         experiment_configs=experiment_configs,
         cache_location=args.cache_location,
+        batch_size=args.batch_size,
     )
