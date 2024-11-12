@@ -27,7 +27,7 @@ class EmbeddingEngine:
         cache_location: str = ":memory:",
     ):
         self.model: SentenceTransformer = torch.compile(
-            SentenceTransformer(model_name, device=device)
+            SentenceTransformer(model_name, device=device, trust_remote_code=True)
         )
         self.quant_type = quant_type
         self.query_count = 0
