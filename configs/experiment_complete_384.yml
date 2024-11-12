@@ -65,7 +65,7 @@ tasks:
   - TempReasonL3Fact
   - TempReasonL3Pure
   - TopiOCQAHardNegatives
-  - Touche2020Retrievalv"
+  - Touche2020Retrieval.v3
   - TRECCOVID
   - WinoGrande
 
