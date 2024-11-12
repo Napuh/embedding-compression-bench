@@ -80,8 +80,15 @@ if __name__ == "__main__":
     markdown += "| Benchmark | Queries | Tokens |\n"
     markdown += "|-----------|----------|--------|\n"
 
+    total_queries = 0
+    total_tokens = 0
     for benchmark, counts in results.items():
         markdown += f"| {benchmark} | {counts['queries']} | {counts['tokens']} |\n"
+        total_queries += counts["queries"]
+        total_tokens += counts["tokens"]
+
+    markdown += "|-----------|----------|--------|\n"
+    markdown += f"| **Total** | **{total_queries}** | **{total_tokens}** |\n"
 
     with open("BENCHMARKS.md", "w") as f:
         f.write(markdown)
