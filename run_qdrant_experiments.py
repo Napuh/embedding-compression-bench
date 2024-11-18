@@ -27,7 +27,7 @@ def generate_random_embeddings(
 def calculate_memory_size(
     num_vectors: int, vector_dim: int, quant_type: QuantizationType
 ) -> float:
-    """Calculate estimated memory size in GB based on quantization type."""
+    """Calculate estimated memory size in MB based on quantization type."""
     bytes_per_element = {
         QuantizationType.FLOAT32: 4,
         QuantizationType.FLOAT16: 2,
@@ -38,7 +38,7 @@ def calculate_memory_size(
     memory_bytes = (
         num_vectors * vector_dim * bytes_per_element[quant_type] * overhead_factor
     )
-    return memory_bytes / (1024**3)  # Convert to GB
+    return memory_bytes / (1024**2)  # Convert to MB
 
 
 def get_quantization_params(experiment: ExperimentConfig):
@@ -141,23 +141,14 @@ def run_qdrant_experiments(
                 current_vector_dim = experiment.pca_config.n_components
 
         # Calculate theoretical memory requirements
-        memory_size_gb = calculate_memory_size(
+        memory_size_mb = calculate_memory_size(
             num_vectors, current_vector_dim, experiment.quantization_type
         )
-        print(f"Estimated memory requirement: {memory_size_gb:.2f} GB")
+        print(f"Estimated memory requirement: {memory_size_mb:.2f} MB")
 
         # Get quantization parameters
         qdrant_dtype, numpy_dtype, distance_type, search_params, quantization_config = (
             get_quantization_params(experiment)
-        )
-
-        # Generate sample embeddings for payload size calculation
-        sample_embeddings = generate_random_embeddings(
-            batch_size, current_vector_dim, dtype=numpy_dtype
-        )
-
-        avg_request_size, avg_payload_size = calculate_payload_sizes(
-            client, collection_name, batch_size, sample_embeddings
         )
 
         # Delete collection if exists
@@ -173,6 +164,15 @@ def run_qdrant_experiments(
             quantization_config=quantization_config,
             on_disk_payload=False,
             optimizers_config=models.OptimizersConfigDiff(indexing_threshold=0),
+        )
+
+        # Generate sample embeddings for payload size calculation
+        sample_embeddings = generate_random_embeddings(
+            batch_size, current_vector_dim, dtype=numpy_dtype
+        )
+
+        avg_request_size, avg_payload_size = calculate_payload_sizes(
+            client, collection_name, batch_size, sample_embeddings
         )
 
         # Upload vectors in batches, generating them on the fly
@@ -249,7 +249,7 @@ def run_qdrant_experiments(
         experiment_results = {
             "num_vectors": num_vectors,
             "vector_dim": current_vector_dim,
-            "theoretical_memory_gb": memory_size_gb,
+            "theoretical_memory_mb": memory_size_mb,
             "upload_duration_seconds": upload_duration,
             "uploaded_points_per_second": num_vectors / upload_duration,
             "mean_retrieval_time": mean_retrieval_time,
@@ -277,9 +277,9 @@ if __name__ == "__main__":
         default="configs/experiment.yml",
         help="Path to config file",
     )
-    parser.add_argument("--num-vectors", type=int, default=10_000)
-    parser.add_argument("--num-queries", type=int, default=1000)
-    parser.add_argument("--vector-dim", type=int, default=768)
+    parser.add_argument("--num-vectors", type=int, default=100_000)
+    parser.add_argument("--num-queries", type=int, default=10_000)
+    parser.add_argument("--vector-dim", type=int, default=384)
     parser.add_argument("--batch-size", type=int, default=1000)
     parser.add_argument("--output-dir", type=str, default="")
     parser.add_argument("--location", type=str, default="localhost")
@@ -287,7 +287,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     config = load_config(args.config)
-    experiment_configs = create_experiment_configs(config["experiments"])
+    experiment_configs = create_experiment_configs(
+        config["experiments"], experiment_type="qdrant"
+    )
 
     run_qdrant_experiments(
         model_name=config["model_name"],
